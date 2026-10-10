@@ -148,7 +148,65 @@
       }
     }
 
-    function mostrarConfirmacion() {
+
+function mostrarConfirmacion() {
+  const repetidos = paquetes.filter(
+    p => p.codigo === pendiente.codigo
+  ).length;
+
+  mostrar("codigo", "Código: " + pendiente.codigo);
+  mostrar("plu", "PLU: " + pendiente.plu);
+  mostrar("importe", "Importe: " + dinero(pendiente.importe));
+
+  const tarjeta = document.getElementById("confirmacion");
+
+  let aviso = document.getElementById("avisoDuplicado");
+
+  if (!aviso) {
+    aviso = document.createElement("div");
+    aviso.id = "avisoDuplicado";
+    aviso.style.padding = "15px";
+    aviso.style.margin = "15px 0";
+    aviso.style.borderRadius = "10px";
+    aviso.style.fontWeight = "bold";
+
+    tarjeta.insertBefore(
+      aviso,
+      tarjeta.querySelector("button")
+    );
+  }
+
+  const boton = tarjeta.querySelector(".confirmar");
+
+  if (repetidos > 0) {
+    aviso.style.display = "block";
+    aviso.style.background = "#ffe0e0";
+    aviso.style.color = "#9b0000";
+
+    aviso.textContent =
+      "⚠️ ¡CÓDIGO REPETIDO! " +
+      "Este código ya fue agregado " +
+      repetidos + " vez/veces. " +
+      "Comprobá si es el mismo paquete u otro diferente.";
+
+    boton.textContent = "✅ Agregar igualmente";
+
+    mostrar("estado", "⚠️ Posible paquete duplicado");
+  } else {
+    aviso.style.display = "none";
+    boton.textContent = "✅ OK, agregar";
+
+    mostrar("estado", "Lectura detectada");
+  }
+
+  tarjeta.style.display = "block";
+
+  tarjeta.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+}
+
       mostrar("estado", "Lectura detectada");
       mostrar("codigo", "Código: " + pendiente.codigo);
       mostrar("plu", "PLU: " + pendiente.plu);
