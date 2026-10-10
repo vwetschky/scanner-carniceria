@@ -312,5 +312,38 @@
     abrirCamara();
   }
 </script>
+
+<button id="copiarConteo" class="principal"
+  onclick="copiarConteo()"
+  style="display:block; margin:20px auto;">
+  📋 Copiar conteo
+</button>
+
+<script>
+  async function copiarConteo() {
+    if (!paquetes.length) {
+      alert("No hay paquetes para copiar.");
+      return;
+    }
+
+    const codigos = paquetes.map(p => p.codigo).join("\n");
+
+    try {
+      await navigator.clipboard.writeText(codigos);
+      alert(
+        "Se copiaron " + paquetes.length +
+        " paquetes. Ya podés pasarlos al control de stock."
+      );
+    } catch (error) {
+      const campo = document.createElement("textarea");
+      campo.value = codigos;
+      campo.style.width = "100%";
+      campo.style.height = "150px";
+      document.body.appendChild(campo);
+      campo.select();
+      alert("Seleccioná Copiar para guardar estos códigos.");
+    }
+  }
+</script>
 </body>
 </html>
