@@ -30,7 +30,7 @@
 });
         await lector.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 280, height: 150 } },
+      { fps: 15, disableFlip: true },
           codigo => {
             document.getElementById("resultado").textContent =
               "Código leído: " + codigo;
