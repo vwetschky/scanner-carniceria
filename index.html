@@ -21,8 +21,13 @@
     let lector;
 
     async function abrirCamara() {
-      try {
-        lector = new Html5Qrcode("lector");
+      try {lector = new Html5Qrcode("lector", {
+  formatsToSupport: [
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.UPC_A
+  ]
+});
         await lector.start(
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 280, height: 150 } },
