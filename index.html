@@ -207,18 +207,6 @@ function mostrarConfirmacion() {
   });
 }
 
-      mostrar("estado", "Lectura detectada");
-      mostrar("codigo", "Código: " + pendiente.codigo);
-      mostrar("plu", "PLU: " + pendiente.plu);
-      mostrar("importe", "Importe: " + dinero(pendiente.importe));
-
-      document.getElementById("confirmacion").style.display =
-        "block";
-      document.getElementById("confirmacion").scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-      });
-    }
 
     function confirmar() {
       if (!pendiente) return;
