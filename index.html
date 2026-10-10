@@ -1,0 +1,41 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Escáner Carnicería</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body style="font-family:Arial;text-align:center;padding:20px">
+  <h2>CONTROL DE STOCK</h2>
+  <p>Escaneá el código de barras del producto</p>
+  <button id="abrir" onclick="abrirCamara()"
+    style="padding:15px;font-size:18px">
+    📷 Abrir cámara
+  </button>
+  <div id="lector" style="margin-top:20px"></div>
+  <p id="resultado"></p>
+
+  <script>
+    let lector;
+
+    async function abrirCamara() {
+      try {
+        lector = new Html5Qrcode("lector");
+        await lector.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 280, height: 150 } },
+          codigo => {
+            document.getElementById("resultado").textContent =
+              "Código leído: " + codigo;
+          }
+        );
+        document.getElementById("abrir").disabled = true;
+      } catch (error) {
+        alert("No se pudo abrir la cámara: " + error);
+      }
+    }
+  </script>
+</body>
+</html>
