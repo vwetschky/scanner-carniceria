@@ -1,0 +1,395 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control de Stock Carnicería</title>
+  <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 15px;
+      max-width: 550px;
+      margin: auto;
+      text-align: center;
+    }
+    button {
+      font-size: 17px;
+      padding: 14px;
+      border: 0;
+      border-radius: 9px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    .principal { background: #202020; color: white; }
+    .confirmar { background: #198754; color: white; }
+    .cancelar { background: #dddddd; }
+    video {
+      width: 100%;
+      border-radius: 12px;
+      margin-top: 15px;
+    }
+    .tarjeta {
+      background: #f2f2f2;
+      border-radius: 12px;
+      padding: 18px;
+      margin-top: 18px;
+    }
+    .dato { font-size: 20px; margin: 10px 0; }
+    #confirmacion { display: none; }
+    #estado { margin: 15px 0; }
+  </style>
+</head>
+<body>
+  <h2>CONTROL DE STOCK</h2>
+  <p>Escaneá cada paquete y confirmá la lectura.</p>
+
+  <button id="botonAbrir" class="principal"
+    onclick="abrirCamara()">📷 Abrir cámara</button>
+
+  <video id="video" autoplay muted playsinline></video>
+  <p id="estado">Listo para escanear</p>
+
+  <div id="confirmacion" class="tarjeta">
+    <h2>¿Confirmar paquete?</h2>
+    <p class="dato" id="codigo"></p>
+    <p class="dato" id="plu"></p>
+    <p class="dato" id="importe"></p>
+
+    <button class="confirmar" onclick="confirmar()">
+      ✅ OK, agregar
+    </button>
+    <button class="cancelar" onclick="reintentar()">
+      Volver a escanear
+    </button>
+  </div>
+
+  <div class="tarjeta">
+    <h3>CONTEO ACTUAL</h3>
+    <p class="dato">Paquetes: <b id="total">0</b></p>
+    <p class="dato">Importe: <b id="suma">$0</b></p>
+    <p id="ultimo"></p>
+  </div>
+
+  <script>
+    let controles = null;
+    let iniciando = false;
+    let pendiente = null;
+    let paquetes = [];
+
+    const mostrar = (id, texto) => {
+      document.getElementById(id).textContent = texto;
+    };
+
+    const dinero = n =>
+      "$" + n.toLocaleString("es-AR");
+
+    function detenerCamara() {
+      if (controles) {
+        controles.stop();
+        controles = null;
+      }
+    }
+
+    async function abrirCamara() {
+      if (iniciando || controles || pendiente) return;
+
+      iniciando = true;
+      mostrar("estado", "Abriendo cámara...");
+      document.getElementById("botonAbrir").disabled = true;
+
+      try {
+        const lector =
+          new ZXingBrowser.BrowserMultiFormatOneDReader();
+
+        const controlNuevo =
+          await lector.decodeFromConstraints(
+            {
+              audio: false,
+              video: {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+              }
+            },
+            document.getElementById("video"),
+            resultado => {
+              if (!resultado || pendiente) return;
+
+              const codigo = resultado.getText();
+
+              if (!/^\d{13}$/.test(codigo) ||
+                  !codigo.startsWith("2")) return;
+
+              pendiente = {
+                codigo: codigo,
+                plu: codigo.substring(1, 7),
+                importe: Number(codigo.substring(7, 12))
+              };
+
+              detenerCamara();
+              mostrarConfirmacion();
+            }
+          );
+
+        controles = controlNuevo;
+
+        if (pendiente) {
+          detenerCamara();
+        } else {
+          mostrar("estado", "Apuntá al código de barras");
+        }
+      } catch (error) {
+        mostrar("estado", "Error de cámara: " + error.message);
+      } finally {
+        iniciando = false;
+        document.getElementById("botonAbrir").disabled = false;
+      }
+    }
+
+
+function mostrarConfirmacion() {
+  const repetidos = paquetes.filter(
+    p => p.codigo === pendiente.codigo
+  ).length;
+
+  mostrar("codigo", "Código: " + pendiente.codigo);
+  mostrar("plu", "PLU: " + pendiente.plu);
+  mostrar("importe", "Importe: " + dinero(pendiente.importe));
+
+  const tarjeta = document.getElementById("confirmacion");
+
+  let aviso = document.getElementById("avisoDuplicado");
+
+  if (!aviso) {
+    aviso = document.createElement("div");
+    aviso.id = "avisoDuplicado";
+    aviso.style.padding = "15px";
+    aviso.style.margin = "15px 0";
+    aviso.style.borderRadius = "10px";
+    aviso.style.fontWeight = "bold";
+
+    tarjeta.insertBefore(
+      aviso,
+      tarjeta.querySelector("button")
+    );
+  }
+
+  const boton = tarjeta.querySelector(".confirmar");
+
+  if (repetidos > 0) {
+    aviso.style.display = "block";
+    aviso.style.background = "#ffe0e0";
+    aviso.style.color = "#9b0000";
+
+    aviso.textContent =
+      "⚠️ ¡CÓDIGO REPETIDO! " +
+      "Este código ya fue agregado " +
+      repetidos + " vez/veces. " +
+      "Comprobá si es el mismo paquete u otro diferente.";
+
+    boton.textContent = "✅ Agregar igualmente";
+
+    mostrar("estado", "⚠️ Posible paquete duplicado");
+  } else {
+    aviso.style.display = "none";
+    boton.textContent = "✅ OK, agregar";
+
+    mostrar("estado", "Lectura detectada");
+  }
+
+  tarjeta.style.display = "block";
+
+  tarjeta.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+}
+
+
+    function confirmar() {
+      if (!pendiente) return;
+
+      paquetes.push(pendiente);
+
+      const total = paquetes.reduce(
+        (suma, p) => suma + p.importe, 0
+      );
+
+      mostrar("total", String(paquetes.length));
+      mostrar("suma", dinero(total));
+      mostrar("ultimo", "Último código: " + pendiente.codigo);
+
+      pendiente = null;
+      document.getElementById("confirmacion").style.display =
+        "none";
+
+      abrirCamara();
+    }
+
+    function reintentar() {
+      pendiente = null;
+      document.getElementById("confirmacion").style.display =
+        "none";
+      abrirCamara();
+    }
+  </script>
+
+<div style="text-align:center; margin:25px 0;">
+  <button onclick="eliminarUltimo()">
+    ↩️ Eliminar último paquete
+  </button>
+
+  <button class="principal" onclick="finalizarConteo()">
+    ✅ Finalizar conteo
+  </button>
+</div>
+
+<div id="resumenFinal" class="tarjeta" style="display:none">
+  <h2>RESUMEN FINAL</h2>
+  <div id="detalleProductos"></div>
+  <h3 id="totalesFinales"></h3>
+
+  <button onclick="continuarConteo()">
+    📷 Seguir escaneando
+  </button>
+
+  <p>
+    El guardado en Google Sheets se habilitará
+    cuando conectemos la planilla.
+  </p>
+</div>
+
+<script>
+  function actualizarConteo() {
+    const importeTotal = paquetes.reduce(
+      (suma, p) => suma + p.importe, 0
+    );
+
+    mostrar("total", String(paquetes.length));
+    mostrar("suma", dinero(importeTotal));
+    mostrar(
+      "ultimo",
+      paquetes.length
+        ? "Último código: " + paquetes[paquetes.length - 1].codigo
+        : "Sin paquetes"
+    );
+  }
+
+  function eliminarUltimo() {
+    if (pendiente) {
+      alert("Primero confirmá o descartá la lectura actual.");
+      return;
+    }
+
+    if (!paquetes.length) {
+      alert("No hay paquetes para eliminar.");
+      return;
+    }
+
+    if (!confirm("¿Eliminar el último paquete agregado?")) return;
+
+    paquetes.pop();
+    actualizarConteo();
+  }
+
+  function finalizarConteo() {
+    if (pendiente) {
+      alert("Primero confirmá o descartá la lectura actual.");
+      return;
+    }
+
+    if (!paquetes.length) {
+      alert("Todavía no hay paquetes cargados.");
+      return;
+    }
+
+    detenerCamara();
+
+    const resumen = {};
+
+    paquetes.forEach(p => {
+      if (!resumen[p.plu]) {
+        resumen[p.plu] = {
+          unidades: 0,
+          importe: 0
+        };
+      }
+
+      resumen[p.plu].unidades++;
+      resumen[p.plu].importe += p.importe;
+    });
+
+    const detalle = Object.entries(resumen)
+      .map(([plu, datos]) => `
+        <p>
+          <strong>PLU ${plu}</strong><br>
+          ${datos.unidades} paquetes —
+          ${dinero(datos.importe)}
+        </p>
+      `).join("<hr>");
+
+    document.getElementById("detalleProductos").innerHTML =
+      detalle;
+
+    const total = paquetes.reduce(
+      (suma, p) => suma + p.importe, 0
+    );
+
+    mostrar(
+      "totalesFinales",
+      "TOTAL: " + paquetes.length +
+      " paquetes — " + dinero(total)
+    );
+
+    document.getElementById("resumenFinal").style.display =
+      "block";
+
+    document.getElementById("resumenFinal").scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }
+
+  function continuarConteo() {
+    document.getElementById("resumenFinal").style.display =
+      "none";
+    abrirCamara();
+  }
+</script>
+
+<button id="copiarConteo" class="principal"
+  onclick="copiarConteo()"
+  style="display:block; margin:20px auto;">
+  📋 Copiar conteo
+</button>
+
+<script>
+  async function copiarConteo() {
+    if (!paquetes.length) {
+      alert("No hay paquetes para copiar.");
+      return;
+    }
+
+    const codigos = paquetes.map(p => p.codigo).join("\n");
+
+    try {
+      await navigator.clipboard.writeText(codigos);
+      alert(
+        "Se copiaron " + paquetes.length +
+        " paquetes. Ya podés pasarlos al control de stock."
+      );
+    } catch (error) {
+      const campo = document.createElement("textarea");
+      campo.value = codigos;
+      campo.style.width = "100%";
+      campo.style.height = "150px";
+      document.body.appendChild(campo);
+      campo.select();
+      alert("Seleccioná Copiar para guardar estos códigos.");
+    }
+  }
+</script>
+</body>
+</html>
