@@ -5,40 +5,81 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Escáner Carnicería</title>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 15px;
+    }
+    button {
+      padding: 15px;
+      font-size: 18px;
+      margin: 10px;
+    }
+    video {
+      width: 100%;
+      max-width: 500px;
+      border-radius: 10px;
+    }
+    #resultado {
+      font-size: 20px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+    }
+  </style>
 </head>
-<body style="font-family:Arial;text-align:center;padding:20px">
+<body>
   <h2>CONTROL DE STOCK</h2>
   <p>Escaneá el código de barras del producto</p>
-  <button id="abrir" onclick="abrirCamara()"
-    style="padding:15px;font-size:18px">
-    📷 Abrir cámara
-  </button>
-  <div id="lector" style="margin-top:20px"></div>
-  <p id="resultado"></p>
+
+  <button onclick="abrirCamara()">📷 Abrir cámara</button>
+  <button onclick="cerrarCamara()">Detener</button>
+
+  <video id="video" autoplay muted playsinline></video>
+  <p id="resultado">Esperando lectura...</p>
 
   <script>
-    let lector;
+    let controles = null;
 
     async function abrirCamara() {
-      try {lector = new Html5Qrcode("lector", {
-  formatsToSupport: [
-    Html5QrcodeSupportedFormats.EAN_13,
-    Html5QrcodeSupportedFormats.CODE_128,
-    Html5QrcodeSupportedFormats.UPC_A
-  ]
-});
-        await lector.start(
-          { facingMode: "environment" },
-      { fps: 15, disableFlip: true },
-          codigo => {
-            document.getElementById("resultado").textContent =
-              "Código leído: " + codigo;
+      const resultado = document.getElementById("resultado");
+      resultado.textContent = "Iniciando cámara...";
+
+      try {
+        if (controles) {
+          controles.stop();
+          controles = null;
+        }
+
+        const lector = new ZXingBrowser.BrowserMultiFormatOneDReader();
+
+        controles = await lector.decodeFromConstraints(
+          {
+            audio: false,
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }
+          },
+          document.getElementById("video"),
+          (lectura, error) => {
+            if (lectura) {
+              resultado.textContent =
+                "✅ Código leído: " + lectura.getText();
+            }
           }
         );
-        document.getElementById("abrir").disabled = true;
       } catch (error) {
-        alert("No se pudo abrir la cámara: " + error);
+        resultado.textContent = "Error: " + error.message;
+      }
+    }
+
+    function cerrarCamara() {
+      if (controles) {
+        controles.stop();
+        controles = null;
       }
     }
   </script>
