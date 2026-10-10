@@ -189,5 +189,128 @@
       abrirCamara();
     }
   </script>
+
+<div style="text-align:center; margin:25px 0;">
+  <button onclick="eliminarUltimo()">
+    ↩️ Eliminar último paquete
+  </button>
+
+  <button class="principal" onclick="finalizarConteo()">
+    ✅ Finalizar conteo
+  </button>
+</div>
+
+<div id="resumenFinal" class="tarjeta" style="display:none">
+  <h2>RESUMEN FINAL</h2>
+  <div id="detalleProductos"></div>
+  <h3 id="totalesFinales"></h3>
+
+  <button onclick="continuarConteo()">
+    📷 Seguir escaneando
+  </button>
+
+  <p>
+    El guardado en Google Sheets se habilitará
+    cuando conectemos la planilla.
+  </p>
+</div>
+
+<script>
+  function actualizarConteo() {
+    const importeTotal = paquetes.reduce(
+      (suma, p) => suma + p.importe, 0
+    );
+
+    mostrar("total", String(paquetes.length));
+    mostrar("suma", dinero(importeTotal));
+    mostrar(
+      "ultimo",
+      paquetes.length
+        ? "Último código: " + paquetes[paquetes.length - 1].codigo
+        : "Sin paquetes"
+    );
+  }
+
+  function eliminarUltimo() {
+    if (pendiente) {
+      alert("Primero confirmá o descartá la lectura actual.");
+      return;
+    }
+
+    if (!paquetes.length) {
+      alert("No hay paquetes para eliminar.");
+      return;
+    }
+
+    if (!confirm("¿Eliminar el último paquete agregado?")) return;
+
+    paquetes.pop();
+    actualizarConteo();
+  }
+
+  function finalizarConteo() {
+    if (pendiente) {
+      alert("Primero confirmá o descartá la lectura actual.");
+      return;
+    }
+
+    if (!paquetes.length) {
+      alert("Todavía no hay paquetes cargados.");
+      return;
+    }
+
+    detenerCamara();
+
+    const resumen = {};
+
+    paquetes.forEach(p => {
+      if (!resumen[p.plu]) {
+        resumen[p.plu] = {
+          unidades: 0,
+          importe: 0
+        };
+      }
+
+      resumen[p.plu].unidades++;
+      resumen[p.plu].importe += p.importe;
+    });
+
+    const detalle = Object.entries(resumen)
+      .map(([plu, datos]) => `
+        <p>
+          <strong>PLU ${plu}</strong><br>
+          ${datos.unidades} paquetes —
+          ${dinero(datos.importe)}
+        </p>
+      `).join("<hr>");
+
+    document.getElementById("detalleProductos").innerHTML =
+      detalle;
+
+    const total = paquetes.reduce(
+      (suma, p) => suma + p.importe, 0
+    );
+
+    mostrar(
+      "totalesFinales",
+      "TOTAL: " + paquetes.length +
+      " paquetes — " + dinero(total)
+    );
+
+    document.getElementById("resumenFinal").style.display =
+      "block";
+
+    document.getElementById("resumenFinal").scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }
+
+  function continuarConteo() {
+    document.getElementById("resumenFinal").style.display =
+      "none";
+    abrirCamara();
+  }
+</script>
 </body>
 </html>
