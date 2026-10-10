@@ -4,83 +4,189 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Escáner Carnicería</title>
+  <title>Control de Stock Carnicería</title>
   <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      text-align: center;
       padding: 15px;
+      max-width: 550px;
+      margin: auto;
+      text-align: center;
     }
     button {
-      padding: 15px;
-      font-size: 18px;
-      margin: 10px;
+      font-size: 17px;
+      padding: 14px;
+      border: 0;
+      border-radius: 9px;
+      margin: 5px;
+      cursor: pointer;
     }
+    .principal { background: #202020; color: white; }
+    .confirmar { background: #198754; color: white; }
+    .cancelar { background: #dddddd; }
     video {
       width: 100%;
-      max-width: 500px;
-      border-radius: 10px;
+      border-radius: 12px;
+      margin-top: 15px;
     }
-    #resultado {
-      font-size: 20px;
-      font-weight: bold;
-      overflow-wrap: anywhere;
+    .tarjeta {
+      background: #f2f2f2;
+      border-radius: 12px;
+      padding: 18px;
+      margin-top: 18px;
     }
+    .dato { font-size: 20px; margin: 10px 0; }
+    #confirmacion { display: none; }
+    #estado { margin: 15px 0; }
   </style>
 </head>
 <body>
   <h2>CONTROL DE STOCK</h2>
-  <p>Escaneá el código de barras del producto</p>
+  <p>Escaneá cada paquete y confirmá la lectura.</p>
 
-  <button onclick="abrirCamara()">📷 Abrir cámara</button>
-  <button onclick="cerrarCamara()">Detener</button>
+  <button id="botonAbrir" class="principal"
+    onclick="abrirCamara()">📷 Abrir cámara</button>
 
   <video id="video" autoplay muted playsinline></video>
-  <p id="resultado">Esperando lectura...</p>
+  <p id="estado">Listo para escanear</p>
+
+  <div id="confirmacion" class="tarjeta">
+    <h2>¿Confirmar paquete?</h2>
+    <p class="dato" id="codigo"></p>
+    <p class="dato" id="plu"></p>
+    <p class="dato" id="importe"></p>
+
+    <button class="confirmar" onclick="confirmar()">
+      ✅ OK, agregar
+    </button>
+    <button class="cancelar" onclick="reintentar()">
+      Volver a escanear
+    </button>
+  </div>
+
+  <div class="tarjeta">
+    <h3>CONTEO ACTUAL</h3>
+    <p class="dato">Paquetes: <b id="total">0</b></p>
+    <p class="dato">Importe: <b id="suma">$0</b></p>
+    <p id="ultimo"></p>
+  </div>
 
   <script>
     let controles = null;
+    let iniciando = false;
+    let pendiente = null;
+    let paquetes = [];
 
-    async function abrirCamara() {
-      const resultado = document.getElementById("resultado");
-      resultado.textContent = "Iniciando cámara...";
+    const mostrar = (id, texto) => {
+      document.getElementById(id).textContent = texto;
+    };
 
-      try {
-        if (controles) {
-          controles.stop();
-          controles = null;
-        }
+    const dinero = n =>
+      "$" + n.toLocaleString("es-AR");
 
-        const lector = new ZXingBrowser.BrowserMultiFormatOneDReader();
-
-        controles = await lector.decodeFromConstraints(
-          {
-            audio: false,
-            video: {
-              facingMode: { ideal: "environment" },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
-            }
-          },
-          document.getElementById("video"),
-          (lectura, error) => {
-            if (lectura) {
-              resultado.textContent =
-                "✅ Código leído: " + lectura.getText();
-            }
-          }
-        );
-      } catch (error) {
-        resultado.textContent = "Error: " + error.message;
-      }
-    }
-
-    function cerrarCamara() {
+    function detenerCamara() {
       if (controles) {
         controles.stop();
         controles = null;
       }
+    }
+
+    async function abrirCamara() {
+      if (iniciando || controles || pendiente) return;
+
+      iniciando = true;
+      mostrar("estado", "Abriendo cámara...");
+      document.getElementById("botonAbrir").disabled = true;
+
+      try {
+        const lector =
+          new ZXingBrowser.BrowserMultiFormatOneDReader();
+
+        const controlNuevo =
+          await lector.decodeFromConstraints(
+            {
+              audio: false,
+              video: {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+              }
+            },
+            document.getElementById("video"),
+            resultado => {
+              if (!resultado || pendiente) return;
+
+              const codigo = resultado.getText();
+
+              if (!/^\d{13}$/.test(codigo) ||
+                  !codigo.startsWith("2")) return;
+
+              pendiente = {
+                codigo: codigo,
+                plu: codigo.substring(1, 7),
+                importe: Number(codigo.substring(7, 12))
+              };
+
+              detenerCamara();
+              mostrarConfirmacion();
+            }
+          );
+
+        controles = controlNuevo;
+
+        if (pendiente) {
+          detenerCamara();
+        } else {
+          mostrar("estado", "Apuntá al código de barras");
+        }
+      } catch (error) {
+        mostrar("estado", "Error de cámara: " + error.message);
+      } finally {
+        iniciando = false;
+        document.getElementById("botonAbrir").disabled = false;
+      }
+    }
+
+    function mostrarConfirmacion() {
+      mostrar("estado", "Lectura detectada");
+      mostrar("codigo", "Código: " + pendiente.codigo);
+      mostrar("plu", "PLU: " + pendiente.plu);
+      mostrar("importe", "Importe: " + dinero(pendiente.importe));
+
+      document.getElementById("confirmacion").style.display =
+        "block";
+      document.getElementById("confirmacion").scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }
+
+    function confirmar() {
+      if (!pendiente) return;
+
+      paquetes.push(pendiente);
+
+      const total = paquetes.reduce(
+        (suma, p) => suma + p.importe, 0
+      );
+
+      mostrar("total", String(paquetes.length));
+      mostrar("suma", dinero(total));
+      mostrar("ultimo", "Último código: " + pendiente.codigo);
+
+      pendiente = null;
+      document.getElementById("confirmacion").style.display =
+        "none";
+
+      abrirCamara();
+    }
+
+    function reintentar() {
+      pendiente = null;
+      document.getElementById("confirmacion").style.display =
+        "none";
+      abrirCamara();
     }
   </script>
 </body>
